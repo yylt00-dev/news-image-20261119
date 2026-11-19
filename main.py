@@ -1,29 +1,39 @@
 #!/usr/bin/env python3
-"""Entry program for news-image-20261119.
+"""news-image-20261119 entrypoint.
 
-Writes the front page (entry.png, drawn by draw_news.py) to /output.
-Standard library only; deterministic; no network.
+Copies the pre-rendered front page into the grader's output directory.
+Pure standard library, deterministic, no network access.
 """
-import os
-import shutil
+import sys
+from os import environ
+from pathlib import Path
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-MAX_BYTES = 1048576  # the competition's 1 MiB cap
-PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
+SOURCE_NAME = "entry.png"
+PNG_SIGNATURE = bytes((0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A))
+SIZE_LIMIT = 1024 * 1024
 
 
-def main():
-    src = os.path.join(HERE, "entry.png")
-    with open(src, "rb") as fh:
-        head = fh.read(len(PNG_MAGIC))
-        if head != PNG_MAGIC:
-            raise SystemExit("entry.png is not a PNG file")
-    if os.path.getsize(src) > MAX_BYTES:
-        raise SystemExit("entry.png is over the 1 MiB cap")
-    out_dir = os.environ.get("MAKEFUN_OUTPUT_DIR", "/output")
-    os.makedirs(out_dir, exist_ok=True)
-    shutil.copyfile(src, os.path.join(out_dir, "entry.png"))
+def die(message):
+    print(f"error: {message}", file=sys.stderr)
+    raise SystemExit(1)
+
+
+def load_front_page(path):
+    blob = path.read_bytes()
+    if blob[: len(PNG_SIGNATURE)] != PNG_SIGNATURE:
+        die(f"{path} is not a PNG file")
+    if len(blob) > SIZE_LIMIT:
+        die(f"{path} is {len(blob)} bytes, over the 1 MiB cap")
+    return blob
+
+
+def run():
+    folder = Path(__file__).resolve().parent
+    blob = load_front_page(folder / SOURCE_NAME)
+    out_dir = Path(environ.get("MAKEFUN_OUTPUT_DIR", "/output"))
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / SOURCE_NAME).write_bytes(blob)
 
 
 if __name__ == "__main__":
-    main()
+    run()
